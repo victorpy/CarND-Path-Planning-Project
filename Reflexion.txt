@@ -1,0 +1,30 @@
+Reflexion
+
+My code is based on the Q&A walkthrough, i used the same logic to identify the lane my car is and also used the spline approach to create the new path for lane change.
+
+First, we create points for the spline using the as starting coordinates. Then, we use those points of the splien to create the path car will follow, also to limit the velocity of the car. The final points used in next_x_vals and next_y_vals are converted from local car coordinates to global car coordinates before sending to the simulator, so that is the path the car will follow.
+
+About the car Finite State Machine.
+
+To decide what action the car should take when it needs to pass another slow car in the same lane, i had created a state machine that check the position of other cars in my lane and also in the others lanes, based on the data provided by sensor fusion.
+
+For every car detected with sensor fusion, first i check if it is in my lane and is very close, using fabbre coordinates. 
+
+	s_diff = fabs(check_car_s-car_s);
+	
+	//check s vakues grater than s gap
+	if( (check_car_s > car_s) && ( s_diff < 30 ) ){
+
+
+if the s distance of my car position and other car is less than 30 (front and rear), then i mark as too close. Depending on the lane i am, i try to switch lanes to pass the car going slow.
+
+        if( ( (check_car_s > car_s) ||  (check_car_s < car_s) ) && ( fabs(check_car_s-car_s) < safe_s_distance ) )
+
+After deciding to change the lane, my state machine check others cars to see if is safe to switch to another lane. If the lane switching is enabled and some car in another lane is near my car safe distance, i cancel the lane switching setting the variable is_safe to false. 
+
+If lane switching is activated and the is_safe is true, then i execute the lane switching. An that is the final state. Wating for another car in my lane to approach and this process star all over again.
+
+Find in the repo attached two pictures of the car doing more than  4.32 miles lap.
+
+I wish i have more time so i can implement the suggestions to stand out, but im also working full time so i dont have much time left for that :-(. 
+

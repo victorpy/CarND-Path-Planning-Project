@@ -440,7 +440,7 @@ int main() {
           	double ref_y = car_y;
           	double ref_yaw = deg2rad(car_yaw);
           	
-          	//prev size almost empty, use the cart as starting reference
+          	//prev size almost empty, use the car as starting reference
           	if(prev_size < 2){
 				double prev_car_x = car_x - cos(car_yaw);
 				double prev_car_y = car_y - sin(car_yaw);
@@ -459,6 +459,7 @@ int main() {
 				
 				double ref_x_prev = previous_path_x[prev_size-2];
 				double ref_y_prev = previous_path_y[prev_size-2];
+				
 				ref_yaw = atan2(ref_y-ref_y_prev, ref_x-ref_x_prev);
 				
 				ptsx.push_back(ref_x_prev);
