@@ -15,6 +15,22 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
+struct vehicle_struct {
+  int    id;
+  double x;
+  double y;
+  double s;
+  double d;
+  int lane_number;
+};
+
+int convertDToLaneNumber (double d) {
+    if (d < 4.0) {return 0;}
+    if (d >= 4.0 and d < 8.0) {return 1;}
+    if (d > 8.0) {return 2;}
+    return -1;
+}
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -177,6 +193,7 @@ int main() {
 
   int lane = 1;
   double ref_vel = 0.0; // mph
+  int last_check = 0; //0:left 1:right
 
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
@@ -201,7 +218,7 @@ int main() {
   }
  
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel, &last_check](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -250,14 +267,23 @@ int main() {
 			bool very_close = false;
 			bool is_safe = true;
 			int orig_lane = lane;			
-			int safe_s_distance = 20;
-			int last_check = 0; //0:left 1:right		
-			double s_diff = 0.0;	
+			int safe_s_distance = 25;
+			double s_diff = 0.0;
+			double keep_speed = 0.0;	
+			vector<vehicle_struct> vehicles;
 			
 			for(int i = 0; i < sensor_fusion.size(); i++){
 				
-				//------------------start state machine------------//
-				
+				vehicle_struct v;
+				v.id = i;
+				v.x = sensor_fusion[i][1];
+				v.y = sensor_fusion[i][2];
+				v.s = sensor_fusion[i][5];
+				v.d =  sensor_fusion[i][6];
+				v.lane_number = convertDToLaneNumber(sensor_fusion[i][6]);
+				//cout<<"lane "<<v->lane_number;
+				vehicles.push_back(v);
+				//------------------start state machine------------//				
 
 				float d = sensor_fusion[i][6];
 				
@@ -304,20 +330,29 @@ int main() {
 							cout<<"From right Try lane 1"<<endl;
 														
 						}
-					}
+						
+						if(s_diff < 18){//increase deacceleration
+							very_close = true;
+							keep_speed = check_speed;
+							//cout<<"12 speed "<<check_speed<<endl;
+							
+						}	
+					}					
 					
-					if(s_diff < 12){//increase deacceleration
-						very_close = true;
-					}
 					
-				}
+				}								
 				
+			}
+			
+			
+			for(int i = 0; i < vehicles.size(); i++){
+				cout<<" id "<<vehicles[i].id <<" lane "<<vehicles[i].lane_number;
 				
-				//after deciding a lane change, check if it is safe
+				//after deciding a lane change, check if it is safe or revert
 				//im in the center lane
 				if(orig_lane == 1){
 					//check left cars
-					if(d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)) {
+					if(vehicles[i].lane_number == 0 && lane == 0) {
 						double vx = sensor_fusion[i][3];
 						double vy = sensor_fusion[i][4];
 						double check_speed = sqrt(vx*vx + vy*vy);
@@ -340,7 +375,7 @@ int main() {
 					
 					
 					//check right cars
-					if(d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2)) {
+					if(vehicles[i].lane_number == 2 && lane == 2) {
 						double vx = sensor_fusion[i][3];
 						double vy = sensor_fusion[i][4];
 						double check_speed = sqrt(vx*vx + vy*vy);
@@ -365,7 +400,7 @@ int main() {
 				if(orig_lane == 0){
 										
 					//check right cars
-					if(d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2)) {
+					if(vehicles[i].lane_number == 1) {
 						double vx = sensor_fusion[i][3];
 						double vy = sensor_fusion[i][4];
 						double check_speed = sqrt(vx*vx + vy*vy);
@@ -390,7 +425,7 @@ int main() {
 				if(orig_lane == 2){
 										
 					//check left cars
-					if(d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)) {
+					if(vehicles[i].lane_number == 1) {
 						double vx = sensor_fusion[i][3];
 						double vy = sensor_fusion[i][4];
 						double check_speed = sqrt(vx*vx + vy*vy);
@@ -412,7 +447,7 @@ int main() {
 					}
 				}
 			}
-			
+			cout<<endl;
 			//------------------end state machine------------//
 			
 			if(!is_safe){
@@ -420,9 +455,12 @@ int main() {
 				lane = orig_lane;
 			}
 			
-			if(very_close){
-				
-				ref_vel -= 0.454;
+			cout<<"ref_vel "<<ref_vel<<" keep_speed "<<keep_speed<<endl;
+			
+			if(very_close){				
+				cout<<"in very close"<<endl;
+				if(ref_vel > keep_speed)
+					ref_vel -= 1.2;
 				
 			} else if(too_close){
 				//ref_vel -= 0.224;
